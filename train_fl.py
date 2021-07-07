@@ -15,7 +15,7 @@ from fedrec.trainers.base_trainer import BaseTrainer
 from fedrec.utilities import registry
 from fedrec.utilities.logger import NoOpLogger, TBLogger
 from fedrec.utilities.random_state import Reproducible
-
+from fedrec.mulitprocessing.process_manager import MPIProcessManager
 
 def merge_config_and_args(config, args):
     arg_dict = vars(args)
@@ -53,9 +53,14 @@ class FL_Simulator(Reproducible):
             model_preproc=None,
             logger=logger)
 
+        ## If only process_id ==0 has access to comm manager/comm_stream
+        ## all tasks need to go through it. Bad for parallelization & async
         if self.process_id == 0:
             self._setup_workers()
-
+            self.process_manager = MPIProcessManager(config=config_dict["process_manager"],com_manager=self.global_com_manager)
+        
+        else:
+            self.process_manager = MPIProcessManager(config=config_dict["process_manager"],com_manager=None)
     def _setup_workers(self):
         self.worker_list = WorkerDataset()
         self.worker_list.add_worker(
@@ -73,7 +78,7 @@ class FL_Simulator(Reproducible):
 
         map(lambda x: x.run(),
             self.worker_list.get_workers_by_roles('aggregator'))
-        process_manager.run('aggregators', )
+        self.process_manager.run()
 
 
 def main():
