@@ -5,11 +5,9 @@ class Jobber:
     """
     Jobber class only handles job requests based on job type
     """
-    #def __init__(self, trainer, logger) -> None:
-    def __init__(self, num) -> None:
-        self.num = num
-    #    self.logger = logger
-    #    self.trainer: BaseTrainer = trainer
+    def __init__(self, trainer, logger) -> None:
+        self.logger = logger
+        self.trainer: BaseTrainer = trainer
 
     def run(self, message_dict):
         print("here")
@@ -17,11 +15,11 @@ class Jobber:
         if job_type == "train":
             try:
                 worker_state = message_dict["worker_state"]
-                #self.trainer.load_state(worker_state)
-                #self.trainer.train(self.logger)
+                self.trainer.load_state(worker_state)
+                trained_state = self.trainer.train(self.logger)
                 ## Trainer should return state of trained model
                 ## Or do you want to run a worker-specific model
-                return {"worker_state" : self.num + worker_state, "status":"done"}
+                return {"worker_state" : trained_state, "status":"done"}
             except Exception as e:
                 return {"status": "fail", "error": str(e)}
         else:

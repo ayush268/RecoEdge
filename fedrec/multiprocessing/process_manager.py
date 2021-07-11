@@ -16,16 +16,14 @@ class MPIProcessManager:
 
     def __init__(self, config) -> None:
         self.stream_config = config
-        self.executor = MPIPoolExecutor(
-            max_workers=self.stream_config["num_processes"])
-        self.jobber = Jobber(num=2)
+        self.jobber = Jobber(trainer = registry.lookup("trainer"), logger = registry.lookup("logger"))
         self.consumer = KafkaConsumer(
             self.stream_config["consumer_topic"], bootstrap_servers=self.stream_config["bootstrap_servers"], auto_offset_reset="earliest", api_version=(0, 10))
         self.producer = KafkaProducer(bootstrap_servers = self.stream_config["bootstrap_servers"], api_version=(0,10))
 
     def consume(self):
-        with self.executor as executor:
-            while True:
+        while True:
+            with MPIPoolExecutor(max_workers=self.stream_config["num_processes"]) as executor:
                 messages = self.consumer.poll(max_records=self.stream_config["consumer_max_records"])
                 if len(messages.keys()) > 0:
                     for values in messages.values():
