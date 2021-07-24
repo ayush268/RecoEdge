@@ -1,44 +1,48 @@
-from kafka import KafkaProducer
-from fedrec.trainers.base_trainer import BaseTrainer
-from collections import defaultdict
-from typing import Any, Dict, List
-from mpi4py.futures import MPIPoolExecutor, MPICommExecutor
+import mpi4py
+from fedrec.communications.process_com_manager import ProcessComManager
 from fedrec.utilities import registry
-from fedrec.utilities.logger import BaseLogger
-from fedrec.trainers.base_trainer import BaseTrainer
 from fedrec.multiprocessing.job import Jobber
-from kafka import KafkaConsumer
-import json
-from fedrec.communications.kafka_utils import publish_message
 from mpi4py import MPI
-
+import asyncio
 class MPIProcessManager:
 
     def __init__(self, config) -> None:
-        self.stream_config = config
+        self.pool = MPI.COMM_WORLD
+        self.rank = self.pool.Get_rank()
+        self.num_processes = self.pool.Get_size()
         self.jobber = Jobber(trainer = registry.lookup("trainer"), logger = registry.lookup("logger"))
-        self.consumer = KafkaConsumer(
-            self.stream_config["consumer_topic"], bootstrap_servers=self.stream_config["bootstrap_servers"], auto_offset_reset="earliest", api_version=(0, 10))
-        self.producer = KafkaProducer(bootstrap_servers = self.stream_config["bootstrap_servers"], api_version=(0,10))
+        self.enqueued_jobs = []
+        self.process_comm_manager = ProcessComManager(config_dict=config["comm_manager_config"])
+        self.max_jobs_per_process = config["max_jobs_per_process"]
+        self.loop = asyncio.get_event_loop()
 
-    def consume(self):
+
+    def run(self) -> None:
+        self.loop.create_task(self.consume())
+        self.loop.create_task(self.run_jobs())
+        self.loop.run_forever()
+
+    async def consume(self) -> None:
         while True:
-            with MPIPoolExecutor(max_workers=self.stream_config["num_processes"]) as executor:
-                messages = self.consumer.poll(max_records=self.stream_config["consumer_max_records"])
-                if len(messages.keys()) > 0:
-                    for values in messages.values():
-                        for message in values:
-                            key = message.key.decode("utf-8")
-                            message_dict = json.loads(message.value)
-                            if key == "END":
-                                executor.shutdown(wait=True)
-                                return
-                            else:
-                                future = executor.submit(self.jobber.run, message_dict)
-                                result_dict = future.result()
-                                result_dict["worker_id"] = message_dict["worker_id"]
-                                self.produce(result_dict)
+            if len(self.enqueued_jobs) < self.max_jobs_per_process:
+                job_request = self.process_comm_manager.receive_message()
+                if job_request is not None:
+                    if job_request["job_type"] == "END":
+                        self.loop.stop()
+                    self.enqueued_jobs.append(self,job_request)
 
 
-    def produce(self, result):
-        publish_message(self.producer, self.stream_config["producer_topic"], "job_result", json.dumps(result))
+    async def run_jobs(self) -> None:
+        while True:
+            if len(self.enqueued_jobs) > 0:
+                job_request = self.enqueued_jobs.pop(0)
+                job = self.loop.create_task(self.jobber.run(job_request))
+                job.add_done_callback(self.publish())
+
+
+
+    def publish(self, job_result) -> None:
+        self.process_comm_manager.send_message(job_result.result())
+
+    def balance_load(self):
+        #TODO: Balance incoming task consumption between workers

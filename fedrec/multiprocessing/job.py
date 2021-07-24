@@ -19,8 +19,8 @@ class Jobber:
                 trained_state = self.trainer.train(self.logger)
                 ## Trainer should return state of trained model
                 ## Or do you want to run a worker-specific model
-                return {"worker_state" : trained_state, "status":"done"}
+                return {"worker_state" : trained_state, "status":True}
             except Exception as e:
-                return {"status": "fail", "error": str(e)}
+                return {"status": False, "error": str(e)}
         else:
             return ValueError("Current implementation only for train")

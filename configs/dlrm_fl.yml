@@ -44,11 +44,8 @@ communications:
     host4: [0, 1, 0, 0, 0, 1, 0, 2]
   
 process_manager:
-  num_processes : 20
-  bootstrap_servers : ['localhost:9092']
-  consumer_topic: "job_queue"
-  producer_topic: "job_completion"
-  consumer_max_records: 1000
+  max_jobs_per_process: 10
+  comm_manager_config : []
 
 train :
   name : dlrm

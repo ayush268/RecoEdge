@@ -16,7 +16,6 @@ from fedrec.utilities import registry
 from fedrec.utilities.logger import NoOpLogger, TBLogger
 from fedrec.utilities.random_state import Reproducible
 from fedrec.multiprocessing.process_manager import MPIProcessManager
-from fedrec.communications.kafka_utils import publish_message
 
 
 def merge_config_and_args(config, args):
@@ -80,10 +79,8 @@ class FL_Simulator(Reproducible):
         map(lambda x: x.run(),
             self.worker_list.get_workers_by_roles('aggregator'))
 
-        # await until all requests in job queue
-        publish_message(self.process_manager.producer,
-                        self.config_dict["process_manager"]["consumer_topic"], "END", "")
-        self.process_manager.consume()
+        # TODO: Send message here to end all processes
+        self.process_manager.run()
 
 
 def main():
