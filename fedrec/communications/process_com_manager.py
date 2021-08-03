@@ -11,12 +11,7 @@ class ProcessComManager(CommunicationManager):
     def run(self):
         super().run()
 
-    @tag_reciever(JobMessage.JOB_REQUEST)
-    def send_message(self, msg_params):
-        #TODO : Send job completion message to worker comm manager.
-        raise NotImplementedError
 
-    @tag_reciever(JobMessage.JOB_COMPLETION)
-    async def receive_message(self,):
+    def handle_message(self):
         #TODO : Distributed consumption of job requests
         raise NotImplementedError
