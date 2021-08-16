@@ -15,7 +15,6 @@ from fedrec.trainers.base_trainer import BaseTrainer
 from fedrec.utilities import registry
 from fedrec.utilities.logger import NoOpLogger, TBLogger
 from fedrec.utilities.random_state import Reproducible
-from fedrec.multiprocessing.process_manager import MPIProcessManager
 
 
 def merge_config_and_args(config, args):
@@ -58,7 +57,7 @@ class FL_Simulator(Reproducible):
         # all tasks need to go through it. Bad for parallelization & async
         if self.process_id == 0:
             self._setup_workers()
-        self.process_manager = MPIProcessManager(
+        self.process_manager = registry.construct("process_manager",
             config_dict["process_manager"])
 
     def _setup_workers(self):
@@ -74,7 +73,6 @@ class FL_Simulator(Reproducible):
 
     def start_simulation(self):
         # TODO start all aggregators here
-        # TODO create process manager and start it for all processes
 
         map(lambda x: x.run(),
             self.worker_list.get_workers_by_roles('aggregator'))

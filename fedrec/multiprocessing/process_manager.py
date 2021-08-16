@@ -1,9 +1,10 @@
-import mpi4py
-from fedrec.communications.process_com_manager import ProcessComManager
 from fedrec.utilities import registry
 from fedrec.multiprocessing.job import Jobber
 from mpi4py import MPI
 import asyncio
+
+
+@registry.load("process_manager", "MPI_process_manager")
 class MPIProcessManager:
 
     def __init__(self, config) -> None:
@@ -13,7 +14,7 @@ class MPIProcessManager:
         if self.rank !=0:
             self.jobber = Jobber(trainer = registry.lookup("trainer"), logger = registry.lookup("logger"))
             self.enqueued_jobs = asyncio.Queue(maxsize=config["max_jobs_per_process"])
-            self.process_comm_manager = ProcessComManager(config_dict=config["comm_manager_config"])
+            self.process_comm_manager = registry.construct("process_comm_manager", config_dict = config["comm_manager_config"])
             self.loop = asyncio.get_event_loop()
 
 
@@ -26,14 +27,13 @@ class MPIProcessManager:
 
     async def consume(self) -> None:
         while True:
-            if not self.enqueued_jobs.full():
-                job_request = self.process_comm_manager.handle_receive_message()
-                if job_request is not None:
-                    if job_request.JOB_TYPE == "STOP":
-                        # Runs current batch of callbacks and then exit
-                        self.loop.stop()
-                        return
-                    await self.enqueued_jobs.put(job_request)
+            job_request = self.process_comm_manager.receive_message()
+            if job_request is not None:
+                if job_request.JOB_TYPE == "STOP":
+                    # Runs current batch of callbacks and then exit
+                    self.loop.stop()
+                    return
+                await self.enqueued_jobs.put(job_request)
 
 
     async def run_jobs(self) -> None:
