@@ -7,12 +7,12 @@ import asyncio
 @registry.load("process_manager", "MPI_process_manager")
 class MPIProcessManager:
 
-    def __init__(self, config) -> None:
+    def __init__(self, config, trainer, logger) -> None:
         self.pool = MPI.COMM_WORLD
         self.rank = self.pool.Get_rank()
         self.num_processes = self.pool.Get_size()
         if self.rank !=0:
-            self.jobber = Jobber(trainer = registry.lookup("trainer"), logger = registry.lookup("logger"))
+            self.jobber = Jobber(trainer = trainer, logger = logger)
             self.enqueued_jobs = asyncio.Queue(maxsize=config["max_jobs_per_process"])
             self.process_comm_manager = registry.construct("process_comm_manager", config_dict = config["comm_manager_config"])
             self.loop = asyncio.get_event_loop()
