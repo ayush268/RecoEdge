@@ -35,5 +35,6 @@ object Main {
         println(t23.toString())
         println(t24.toString())
         println(t25.toString())
+        println(t22.toList())
     }
 }

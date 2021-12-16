@@ -1,6 +1,7 @@
 package org.nimbleedge.recoedge
 
 import models._
+import scala.collection.mutable.{Map => MutableMap}
 
 import akka.actor.typed.ActorRef
 import akka.actor.typed.Behavior
@@ -63,25 +64,63 @@ class Supervisor(context: ActorContext[Supervisor.Command]) extends AbstractBeha
     // TODO
     // Topology
     // State Information
+    var orcIdToRef : MutableMap[OrchestratorIdentifier, ActorRef[Orchestrator.Command]] = MutableMap.empty
 
     context.log.info("Supervisor Started")
 
+    private def getOrchestratorRef(orcId: OrchestratorIdentifier): ActorRef[Orchestrator.Command] = {
+        orcIdToRef.get(orcId) match {
+            case Some(actorRef) =>
+                actorRef
+            case None =>
+                context.log.info("Creating new orchestrator actor for {}", orcId.toString())
+                val actorRef = context.spawn(Orchestrator(orcId), s"orchestrator-${orcId.toString()}")
+                context.watchWith(actorRef, OrchestratorTerminated(actorRef, orcId))
+                orcIdToRef += orcId -> actorRef
+                actorRef
+        }
+    }
+
     override def onMessage(msg: Command): Behavior[Command] =
         msg match {
-            case trackMsg @ RequestOrchestrator(requestId, orcId, replyTo) =>
-                // TODO
+            case RequestOrchestrator(requestId, orcId, replyTo) =>
+                val actorRef = getOrchestratorRef(orcId)
+                replyTo ! OrchestratorRegistered(actorRef)
                 this
             
             case trackMsg @ RequestAggregator(requestId, aggId, replyTo) =>
-                // TODO
+                // First of the identifier list is 
+                // TODO add protection (some/none) monad (condition) here
+                // TODO add top-down traversal in identifier class
+                val orcId = aggId.toList()[0]
+
+                val orchestratorRef = getOrchestratorRef(orcId)
+                orchestratorRef ! trackMsg
                 this
             
             case trackMsg @ RequestTrainer(requestId, traId, replyTo) =>
-                // TODO
+                // First of the identifier list is 
+                // TODO add protection (some/none) monad (condition) here
+                // TODO add top-down traversal in identifier class
+                val orcId = traId.toList()[0]
+
+                val orchestratorRef = getOrchestratorRef(orcId)
+                orchestratorRef ! trackMsg
                 this
             
             case trackMsg @ RequestTopology(requestId, entity, replyTo) =>
                 // TODO
+                // First of the identifier list is 
+                // TODO add protection (some/none) monad (condition) here
+                // TODO add top-down traversal in identifier class
+                val orcId = entity.toList()[0]
+
+                orcIdToRef.get(orcId) match {
+                    case Some(actorRef) =>
+                        actorRef ! trackMsg
+                    case None =>
+                        context.log.info("Orchestrator with id {} does not exist, can't request topology", orcId.toString())
+                }
                 this
             
             case StartCycle(requestId, replyTo) =>

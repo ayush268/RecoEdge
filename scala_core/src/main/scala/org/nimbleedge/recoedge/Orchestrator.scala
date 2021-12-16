@@ -30,21 +30,59 @@ class Orchestrator(context: ActorContext[Orchestrator.Command], orcId: Orchestra
 
   // TODO
   // Add state and persistent information
-
+  var aggIdToRef : MutableMap[AggregatorIdentifier, ActorRef[Aggregator.Command]] = MutableMap.empty
   context.log.info("Orchestrator {} started", orcId.toString())
+  
+  private def getAggregatorRef(aggId: AggregatorIdentifier): ActorRef[Aggregator.Command] = {
+    aggIdToRef.get(aggId) match {
+        case Some(actorRef) =>
+            actorRef
+        case None =>
+            context.log.info("Creating new aggregator actor for {}", aggId.toString())
+            val actorRef = context.spawn(Aggregator(aggId), s"aggregator-${aggId.toString()}")
+            context.watchWith(actorRef, AggregatorTerminated(actorRef, aggId))
+            aggIdToRef += aggId -> actorRef
+            actorRef
+    }
+  }
+  
+  private def getTrainerRef(traId: TrainerIdentifier): ActorRef[Trainer.Command] = {
+    traIdToRef.get(traId) match {
+        case Some(actorRef) =>
+            actorRef
+        case None =>
+            context.log.info("Creating new trainer actor for {}", traId.toString())
+            val actorRef = context.spawn(Trainer(traId), s"aggregator-${traId.toString()}")
+            context.watchWith(actorRef, TrainerTerminated(actorRef, traId))
+            traIdToRef += traId -> actorRef
+            actorRef
+    }
+  }
 
   override def onMessage(msg: Command): Behavior[Command] =
     msg match {
       case trackMsg @ RequestAggregator(requestId, aggId, replyTo) =>
-        // TODO
+        actorRef = getAggregatorRef(aggId)
+        replyTo ! AggregatorRegistered(actorRef)
         this
 
       case trackMsg @ RequestTrainer(requestId, traId, replyTo) =>
-        // TODO
+        val traId = traId.toList()[1]
+
+        actorRef = getTrainerRef(traId)
+        replyTo ! TrainerRegistered(actorRef)
         this
       
       case trackMsg @ RequestTopology(requestId, entity, replyTo) =>
         // TODO
+        val aggId = entity.toList()[0]
+
+        orcIdToRef.get(aggId) match {
+            case Some(actorRef) =>
+                actorRef ! trackMsg
+            case None =>
+                context.log.info("Orchestrator with id {} does not exist, can't request topology", aggId.toString())
+        }
         this
       
       case AggregatorTerminated(actor, aggId) =>
