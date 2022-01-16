@@ -47,8 +47,7 @@ object FLSystemManager {
         with Orchestrator.Command
         with Aggregator.Command
     
-    // TODO
-    final case class Topology(requestId: Long)
+    final case class Topology(requestId: Long, topology: TopologyTree)
 
     // Start cycle
     // TODO

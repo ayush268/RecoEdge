@@ -4,7 +4,7 @@ import java.security.{MessageDigest => MD}
 import java.nio.ByteBuffer
 import scala.collection.mutable.ListBuffer
 
-abstract class Identifier {
+sealed abstract class Identifier {
     def name() : String
     def computeDigest() : Array[Byte]
     val digest : Array[Byte] = computeDigest()

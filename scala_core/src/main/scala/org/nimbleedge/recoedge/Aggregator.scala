@@ -17,7 +17,7 @@ object Aggregator {
     
     trait Command
 
-    // In cae of any Trainer / Aggregator (Chile) Termination
+    // In case of any Trainer / Aggregator (Child) Termination
     private final case class AggregatorTerminated(actor: ActorRef[Aggregator.Command], aggId: AggregatorIdentifier)
         extends Aggregator.Command
     
