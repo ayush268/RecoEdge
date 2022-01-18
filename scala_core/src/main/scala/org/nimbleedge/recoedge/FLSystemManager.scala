@@ -41,13 +41,13 @@ object FLSystemManager {
     private final case class OrchestratorTerminated(actor: ActorRef[Orchestrator.Command], orcId: OrchestratorIdentifier)
         extends FLSystemManager.Command
 
-    // Requesting Topology
-    final case class RequestTopology(requestId: Long, entity: Either[OrchestratorIdentifier, AggregatorIdentifier], replyTo: ActorRef[Topology])
+    // Requesting RealTimeGraph
+    final case class RequestRealTimeGraph(requestId: Long, entity: Either[OrchestratorIdentifier, AggregatorIdentifier], replyTo: ActorRef[RespondRealTimeGraph])
         extends FLSystemManager.Command
         with Orchestrator.Command
         with Aggregator.Command
     
-    final case class Topology(requestId: Long, topology: TopologyTree)
+    final case class RespondRealTimeGraph(requestId: Long, realTimeGraph: TopologyTree)
 
     // Start cycle
     // TODO
@@ -62,7 +62,7 @@ class FLSystemManager(context: ActorContext[FLSystemManager.Command]) extends Ab
     import FLSystemManager._
 
     // TODO
-    // Topology
+    // Topology ??
     // State Information
     var orcIdToRef : MutableMap[OrchestratorIdentifier, ActorRef[Orchestrator.Command]] = MutableMap.empty
 
@@ -102,7 +102,7 @@ class FLSystemManager(context: ActorContext[FLSystemManager.Command]) extends Ab
                 orchestratorRef ! trackMsg
                 this
             
-            case trackMsg @ RequestTopology(requestId, entity, replyTo) =>
+            case trackMsg @ RequestRealTimeGraph(requestId, entity, replyTo) =>
                 val orcId = entity match {
                     case Left(x) => x
                     case Right(x) => x.getOrchestrator()
@@ -112,7 +112,7 @@ class FLSystemManager(context: ActorContext[FLSystemManager.Command]) extends Ab
                     case Some(actorRef) =>
                         actorRef ! trackMsg
                     case None =>
-                        context.log.info("Orchestrator with id {} does not exist, can't request topology", orcId.name())
+                        context.log.info("Orchestrator with id {} does not exist, can't request realTimeGraph", orcId.name())
                 }
                 this
             

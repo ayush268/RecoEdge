@@ -1,6 +1,7 @@
 package org.nimbleedge.recoedge
 
 import models._
+import scala.concurrent.duration._
 import scala.collection.mutable.{Map => MutableMap}
 
 import akka.actor.typed.ActorRef
@@ -27,7 +28,7 @@ object Orchestrator {
 
 class Orchestrator(context: ActorContext[Orchestrator.Command], orcId: OrchestratorIdentifier) extends AbstractBehavior[Orchestrator.Command](context) {
   import Orchestrator._
-  import FLSystemManager.{ RequestAggregator, AggregatorRegistered, RequestTrainer, RequestTopology }
+  import FLSystemManager.{ RequestAggregator, AggregatorRegistered, RequestTrainer, RequestRealTimeGraph }
 
   // TODO
   // Add state and persistent information
@@ -69,7 +70,7 @@ class Orchestrator(context: ActorContext[Orchestrator.Command], orcId: Orchestra
         }
         this
       
-      case trackMsg @ RequestTopology(requestId, entity, replyTo) =>
+      case trackMsg @ RequestRealTimeGraph(requestId, entity, replyTo) =>
         val entityOrcId = entity match {
           case Left(x) => x
           case Right(x) => x.getOrchestrator()
@@ -80,10 +81,18 @@ class Orchestrator(context: ActorContext[Orchestrator.Command], orcId: Orchestra
         } else {
           entity match {
             case Left(x) =>
-              // TODO
-              // Give current node's topology
+              // Give current node's realTimeGraph
+              context.log.info("Creating new realTimeGraph query actor for {}", entity)
+              context.spawnAnonymous(RealTimeGraphQuery(
+                creator = entity,
+                aggIdToRefMap = aggIdToRef.toMap,
+                traIds = None,
+                requestId = requestId,
+                requester = replyTo,
+                timeout = 30.seconds
+              ))
             case Right(x) =>
-              // Will always include current aggregator at the end
+              // Will always include current aggregator at the head
               val aggList = x.getAggregators()
               val aggId = aggList.head
               val aggRef = getAggregatorRef(aggId)

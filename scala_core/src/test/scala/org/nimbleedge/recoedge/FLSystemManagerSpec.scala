@@ -1,5 +1,7 @@
 package org.nimbleedge.recoedge
 
+import scala.concurrent.duration._
+
 import akka.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.scalatest.wordspec.AnyWordSpecLike
 
@@ -68,6 +70,20 @@ class FLSystemManagerSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike
 			val aggActor2 = registered4.actor
 
 			aggActor1 should !==(aggActor2)
+
+			// Test RealTimeGraph
+			val realTimeGraphProbe = createTestProbe[RespondRealTimeGraph]()
+
+			managerActor ! RequestRealTimeGraph(104, Left(o1), realTimeGraphProbe.ref)
+			val registered5 = realTimeGraphProbe.receiveMessage(35.seconds)
+			val expectedTree = Node(
+				Left(o1), Set(
+					Node(Right(a1), Set.empty),
+					Node(Right(a2), Set(
+						Leaf(t3),
+						Node(Right(a3), Set(
+							Leaf(t5)))))))
+			registered5.realTimeGraph should ===(expectedTree)
 
 			// TODO
 			// add more tests here

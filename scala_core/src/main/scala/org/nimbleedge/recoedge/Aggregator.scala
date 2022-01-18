@@ -1,6 +1,8 @@
 package org.nimbleedge.recoedge
 
 import models._
+import scala.concurrent.duration._
+import scala.collection.mutable.{Map => MutableMap}
 
 import akka.actor.typed.ActorRef
 import akka.actor.typed.Behavior
@@ -9,7 +11,6 @@ import akka.actor.typed.scaladsl.ActorContext
 import akka.actor.typed.scaladsl.AbstractBehavior
 import akka.actor.typed.Signal
 import akka.actor.typed.PostStop
-import scala.collection.mutable.{Map => MutableMap}
 
 object Aggregator {
     def apply(aggId: AggregatorIdentifier): Behavior[Command] =
@@ -30,7 +31,7 @@ object Aggregator {
 
 class Aggregator(context: ActorContext[Aggregator.Command], aggId: AggregatorIdentifier) extends AbstractBehavior[Aggregator.Command](context) {
     import Aggregator._
-    import FLSystemManager.{ RequestTrainer, TrainerRegistered, RequestAggregator, AggregatorRegistered, RequestTopology }
+    import FLSystemManager.{ RequestTrainer, TrainerRegistered, RequestAggregator, AggregatorRegistered, RequestRealTimeGraph }
 
     // TODO
     // Add state and persistent information
@@ -117,15 +118,23 @@ class Aggregator(context: ActorContext[Aggregator.Command], aggId: AggregatorIde
                 }
                 this    
             
-            case trackMsg @ RequestTopology(requestId, entity, replyTo) =>
+            case trackMsg @ RequestRealTimeGraph(requestId, entity, replyTo) =>
                 entity match {
                     case Left(x) => 
-                        context.log.info("Cannot get topology for an orchestrator entity: got {}", x.toString())
+                        context.log.info("Cannot get realTimeGraph for an orchestrator entity: got {}", x.toString())
 
                     case Right(x) => 
                         if (aggId == x) {
-                            // TODO
-                            // return/build the current node's topology
+                            // return/build the current node's realTimeGraph
+                            context.log.info("Creating new realTimeGraph query actor for {}", entity)
+                            context.spawnAnonymous(RealTimeGraphQuery(
+                              creator = entity,
+                              aggIdToRefMap = aggregatorIdsToRef.toMap,
+                              traIds = Some(trainerIdsToRef.keys.toList),
+                              requestId = requestId,
+                              requester = replyTo,
+                              timeout = 30.seconds
+                            ))
                         } else {
                             val aggList = x.getAggregators()
                             if (aggList.find(y => {aggId == y}) == None) {
